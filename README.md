@@ -69,6 +69,6 @@ The Laravel framework is open-sourced software licensed under the [MIT license](
 The system is a web-based platform for Ana Fatima Barroso’s Dental Clinic that allows patients to book, cancel, or reschedule appointments online. It helps staff manage schedules, records, and supplies, while reducing no-shows through reminders. It improves clinic efficiency and enhances patient satisfaction.
 >>>>>>> 5c8f621e5ff65b455b28ae99223869867e748f30
 
-# Dental-Clinic-Appointment
-The system is a web-based platform for Ana Fatima Barroso’s Dental Clinic that allows patients to book, cancel, or reschedule appointments online. It helps staff manage schedules, records, and supplies, while reducing no-shows through reminders. It improves clinic efficiency and enhances patient satisfaction.
->>>>>>> 33234fdef101442287f295d9e64436ca27dd21da
+
+-- Dental Clinic Appointment System
+-- April 2025
