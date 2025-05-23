@@ -187,17 +187,32 @@
                                                 @endif
 
                                                 @if ($appointment->status === 'Attended')
-                                                    <button
-                                                        data-modal-target="review-appointment-modal-{{ $appointment->id }}"
-                                                        data-modal-toggle="review-appointment-modal-{{ $appointment->id }}"
-                                                        class="bg-blue-500 font-medium text-white p-2 rounded-lg px-6 shadow-lg hover:bg-blue-600 transition w-full md:w-auto">
-                                                        <i class="fa-solid fa-star pr-2"></i> Leave a Review
-                                                    </button>
-
-                                                    <x-review-modal :modalId="'review-appointment-modal-' . $appointment->id" :route="route('appointments.review', ['id' => $appointment->id])"
-                                                        :services="$appointment->appointments" />
-
-
+                                                    @php
+                                                        // Check if user has already reviewed this appointment
+                                                        $existingReview = \App\Models\Review::where('user_id', Auth::id())
+                                                            ->where('appointment_id', $appointment->id)
+                                                            ->first();
+                                                    @endphp
+                                                    
+                                                    @if ($existingReview)
+                                                        <!-- Show already reviewed message -->
+                                                        <button
+                                                            class="bg-gray-400 font-medium text-white p-2 rounded-lg px-6 shadow-lg cursor-not-allowed w-full md:w-auto">
+                                                            <i class="fa-solid fa-check-circle pr-2"></i> Reviewed
+                                                        </button>
+                                                    @else
+                                                        <!-- Show review button -->
+                                                        <button
+                                                            data-modal-target="review-appointment-modal-{{ $appointment->id }}"
+                                                            data-modal-toggle="review-appointment-modal-{{ $appointment->id }}"
+                                                            class="bg-blue-500 font-medium text-white p-2 rounded-lg px-6 shadow-lg hover:bg-blue-600 transition w-full md:w-auto">
+                                                            <i class="fa-solid fa-star pr-2"></i> Leave a Review
+                                                        </button>
+                                                
+                                                        <x-review-modal :modalId="'review-appointment-modal-' . $appointment->id" 
+                                                            :route="route('appointments.review', ['id' => $appointment->id])"
+                                                            :services="$appointment->appointments" />
+                                                    @endif
                                                 @endif
 
                                                 <script>
@@ -312,22 +327,23 @@
 
 
                                         <script>
-                                            function openModal(appointmentId) {
+                                           function openModal(appointmentId) {
                                                 document.getElementById('messageContent').value = "Loading...";
+                                            
                                                 fetch(`/view-history/${appointmentId}`)
                                                     .then(response => response.json())
                                                     .then(data => {
+                                                        console.log(data); // Display all the data in the console
+                                            
                                                         document.getElementById('patientName').innerText = data.appointment.patient_name;
                                                         document.getElementById('phoneNumber').innerText = data.appointment.phone;
                                                         document.getElementById('appointmentReason').innerText = data.appointment.appointments;
-                                                        document.getElementById('appointmentDate').innerText = new Date(data.appointment.date)
-                                                            .toLocaleDateString();
+                                                        document.getElementById('appointmentDate').innerText = new Date(data.appointment.date).toLocaleDateString();
                                                         document.getElementById('appointmentTime').innerText = data.appointment.time;
                                                         document.getElementById('appointmentStatus').innerText = data.appointment.status;
-
-                                                        document.getElementById('messageContent').value = data.message ? data.message :
-                                                            'No message available.';
-
+                                            
+                                                        document.getElementById('messageContent').value = data.message ? data.message : 'No message available.';
+                                            
                                                         document.getElementById('modal').classList.remove('hidden');
                                                     })
                                                     .catch(error => {
@@ -335,6 +351,7 @@
                                                         document.getElementById('messageContent').value = "Error loading message.";
                                                     });
                                             }
+
 
                                             function closeModal() {
                                                 document.getElementById('modal').classList.add('hidden');

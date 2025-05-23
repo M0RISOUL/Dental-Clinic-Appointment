@@ -42,8 +42,10 @@ class AppServiceProvider extends ServiceProvider
                     ->whereNull('read_at')
                     ->count();
 
-                    $approvedApplications = Appointment::where('status', 'Approved')->count();
-
+                 $approvedApplications = Appointment::where('status', 'Approved')
+                                    ->where('user_id', Auth::id()) // Filter by the authenticated user's ID
+                                    ->count();
+                                    
                     if (Auth::check()) {
                         $showModal = !session()->has('hide_modal') && $approvedApplications > 0;
                     } else {

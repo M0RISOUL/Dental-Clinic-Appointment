@@ -1,0 +1,34 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Redirect www to non-www and enforce HTTPS
+    RewriteCond %{HTTP_HOST} ^www\. [NC,OR]
+    RewriteCond %{HTTPS} off
+    RewriteRule ^ https://dentalclinicdmd.com/%{REQUEST_URI} [L,R=301,NE]
+
+    # Redirect requests to public directory
+    RewriteCond %{REQUEST_URI} !^/public
+    RewriteRule ^(.*)$ /public/$1 [L]
+
+    # Handle Laravel routing for non-existing directories and files
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Disable Directory listing
+Options -Indexes
+
+# Block files which need to be hidden
+<Files ~ "\.(env|config.js|md|gitignore|gitattributes|lock|example)$">
+    Order allow,deny
+    Deny from all
+</Files>
+
+php_value memory_limit 2048M
+
+# # Block specific files
+# <Files "artisan">
+#     Order allow,deny
+#     Deny from all
+# </Files>

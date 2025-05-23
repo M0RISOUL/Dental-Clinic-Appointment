@@ -25,6 +25,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\SettingsController;
+
 
 // Test route
 Route::get('/test', function () {
@@ -43,20 +45,32 @@ Route::post('/payments/store', [PaymentController::class, 'store'])->name('payme
 // RECEIPT VIEWER FOR PATIENT (ADD DOWNLOAD PDF)
 Route::get('/receipts/{id}', [ReceiptController::class, 'show'])->name('receipt.show');
 
-// LANDING PAGE
-Route::get('/', [HomeController::class, 'index'])->name('home');
-Route::get('/about', [HomeController::class, 'about'])->name('about');
-Route::get('/doctor', [HomeController::class, 'doctor'])->name('doctor');
-Route::get('/contact', [HomeController::class, 'contact'])->name('contact');
-Route::get('/service', [HomeController::class, 'service'])->name('service');
+
+Route::middleware(['guest', 'preventBackHistory'])->group(function () {
+    Route::get('/', [HomeController::class, 'index'])->name('home');
+    Route::get('/about', [HomeController::class, 'about'])->name('about');
+    Route::get('/doctor', [HomeController::class, 'doctor'])->name('doctor');
+    Route::get('/contact', [HomeController::class, 'contact'])->name('contact');
+    // Route::get('/service', [HomeController::class, 'service'])->name('service');
+    Route::get('/services', [HomeController::class, 'services'])->name('services');
+    Route::get('/careers', [HomeController::class, 'careers'])->name('careers');
+
+    Route::post('/jobs/filter', [HomeController::class, 'filter'])->name('jobs.filter');
+    Route::get('/jobs/filter', [HomeController::class, 'filter'])->name('jobs.filterget');
+    
+    Route::post('/jobs/apply/{Id}', [HomeController::class, 'applyjob'])->name('jobs.jobapply');
+    Route::get('/login', [LoginController::class, 'create'])->name('login');
+    Route::post('/login', [LoginController::class, 'store']);
+    Route::post('/jobs/filter', [HomeController::class, 'filter'])->name(name: 'jobs.filter');
+});
 
 
-Route::middleware(['auth', 'verified', PreventBackHistory::class])->group(function () {
+
+Route::middleware(['auth', 'verified', 'preventBackHistory'])->group(function () {
     // FOR PATIENT USERS
     Route::middleware(['patientMiddleware'])->group(function () {
         Route::get('/patient/dashboard', [PatientController::class, 'index'])->name('patient.dashboard');
         Route::get('/patient/calendar', [PatientController::class, 'calendar'])->name('calendar');
-        Route::get('/patient/messaging', [PatientController::class, 'messages'])->name('messages');
         Route::get('/patient/notifications', [PatientController::class, 'notifications'])->name('notifications');
         Route::get('/patient/history', [PatientController::class, 'history'])->name('history');
         Route::get('/view-history/{appointmentId}', [PatientController::class, 'viewHistory'])->name('viewhistory');
@@ -68,26 +82,17 @@ Route::middleware(['auth', 'verified', PreventBackHistory::class])->group(functi
 
         Route::get('/patient/pricing', [PatientController::class, 'pricing'])->name('pricing');
 
-        //FOR GETTING MESSAGES
-        Route::get('/patient/messaging', [MessageController::class, 'getMessages'])->name('messages');
+
 
         // REDIRECT TO BOOK APPOINTMENT
         Route::get('/patient/bookappointment/{id}', [PatientController::class, 'bookappointment'])
             ->name('patient.bookappointment');
 
 
-        //FOR GETTING REPLIES
-        Route::get('/patient/messages/{messageId}/replies', [MessageController::class, 'getReplies'])->name('messages.replies');
 
-        //FOR POSTING A MESSAGE
-        Route::post('/patient/messages/{messageId}/messages', [MessageController::class, 'postMessage'])->name('messages.create.post');
-
-        //FOR POSTING A REPLY
-        Route::post('/patient/messages/{messageId}/replies', [MessageController::class, 'postReply'])->name('messages.replies.post');
         Route::get('/api/upcoming-appointment', [PatientController::class, 'getUpcomingAppointment']);
 
-        // FOR UPDATING THE READ_aT
-        Route::post('/update-seen-status/{id}', [MessageController::class, 'updateSeenStatus']);
+
 
         // FOR FETCHING APPOINTMENTS
         Route::get('/appointments/{date}', action: [PatientController::class, 'fetchAppointments']);
@@ -104,8 +109,26 @@ Route::middleware(['auth', 'verified', PreventBackHistory::class])->group(functi
             session(['hide_modal' => true]); // Store session to hide modal
             return redirect()->back();
         })->name('hide.modal');
-        
+
     });
+
+
+    // Route::get('/patient/messaging', [PatientController::class, 'messages'])->name('messages');
+
+    //FOR GETTING MESSAGES
+    Route::get('/user/messaging', [MessageController::class, 'getMessages'])->name('messages');
+
+    //FOR GETTING REPLIES
+    Route::get('/user/messages/{messageId}/replies', [MessageController::class, 'getReplies'])->name('messages.replies');
+
+    //FOR POSTING A MESSAGE
+    Route::post('/user/messages/messages', [MessageController::class, 'postMessage'])->name('messages.create.post');
+
+    //FOR POSTING A REPLY
+    Route::post('/user/messages/{messageId}/replies', [MessageController::class, 'postReply'])->name('messages.replies.post');
+
+    // FOR UPDATING THE READ_AT
+    Route::post('/update-seen-status/{id}', [MessageController::class, 'updateSeenStatus']);
 
 
     // FOR APPOINTMENT
@@ -126,6 +149,34 @@ Route::middleware(['auth', 'verified', PreventBackHistory::class])->group(functi
         Route::get('/admin/reports', [AdminController::class, 'reports'])->name('admin.reports');
         Route::get('/admin/graph', [AppointmentController::class, 'graph'])->name('admin.graph');
         Route::get('/admin/approved_appointments', [AdminController::class, 'approvedAppointments'])->name('admin.approved_appointments');
+        
+        //Manage Jobs Routes
+        Route::get('/admin/manage_jobs', [AdminController::class, 'jobs'])->name('admin.manage_jobs');
+        Route::get('/admin/personnel', [AdminController::class, 'personnel'])->name('admin.personnel');
+        
+        Route::put('/admin/personnel/update/{id}', [AdminController::class, 'updatepersonnel'])->name('admin.updatepersonnel');
+        Route::post('/admin/personnel/store', [AdminController::class, 'storepersonnel'])->name('admin.storepersonnel');
+        Route::post('/admin/personnel/{id}/delete', [AdminController::class, 'deletepersonnel'])->name('admin.deletepersonnel');
+
+        //Career Jobs
+        // Route for editing a job (PUT request)
+        Route::put('/admin/job/update/{id}', [AdminController::class, 'updatejob'])->name('admin.updatejob');
+        // Route for adding a new job (POST request)
+        Route::post('/admin/job/store', [AdminController::class, 'storejob'])->name('admin.storejob');
+        // Route for deleting a job (POST request)
+        Route::post('/admin/job/{id}/delete', [AdminController::class, 'deletejob'])->name('admin.deletejob');
+
+        //HIRE APPLICANT 
+        Route::put('/admin/job/hire/{id}', [AdminController::class, 'hire'])->name('admin.hire');
+
+        
+        // Clinic Announcement Routes
+        Route::get('/announcements/active', [App\Http\Controllers\ClinicAnnouncementController::class, 'getActive']);
+        Route::get('/announcements', [App\Http\Controllers\ClinicAnnouncementController::class, 'index']);
+        Route::post('/announcements', [App\Http\Controllers\ClinicAnnouncementController::class, 'store']);
+        Route::get('/announcements/{announcement}', [App\Http\Controllers\ClinicAnnouncementController::class, 'show']);
+        Route::put('/announcements/{announcement}', [App\Http\Controllers\ClinicAnnouncementController::class, 'update']);
+        Route::delete('/announcements/{announcement}', [App\Http\Controllers\ClinicAnnouncementController::class, 'destroy']);
 
         // User Management Routes
         Route::get('/admin/users', [UserController::class, 'index'])->name('admin.users');
@@ -156,7 +207,19 @@ Route::middleware(['auth', 'verified', PreventBackHistory::class])->group(functi
 
         // General appointments route
         Route::get('/admin/appointments', [AdminAppointmentController::class, 'index'])->name('admin.appointments.index');
-
+        
+        Route::get('/admin/settings/contact', [App\Http\Controllers\Admin\SettingsController::class, 'contactSettings'])->name('admin.settings.contact');
+        Route::post('/admin/settings/contact', [App\Http\Controllers\Admin\SettingsController::class, 'updateContactSettings'])->name('admin.settings.update-contact');
+        Route::get('/admin/settings/services', [App\Http\Controllers\Admin\SettingsController::class, 'servicesSettings'])->name('admin.settings.services');
+        Route::post('/admin/settings/services', [App\Http\Controllers\Admin\SettingsController::class, 'updateServicesSettings'])->name('admin.settings.update-services');
+        // Pricing settings
+        Route::get('/settings/pricing', [App\Http\Controllers\Admin\SettingsController::class, 'pricingSettings'])->name('admin.settings.pricing');
+        Route::post('/settings/pricing', [App\Http\Controllers\Admin\SettingsController::class, 'updatePricingSettings'])->name('admin.settings.pricing.update');    // About page settings
+        // About page settings
+        Route::get('/admin/settings/about', [App\Http\Controllers\Admin\SettingsController::class, 'aboutSettings'])
+            ->name('admin.settings.about');
+        Route::post('/admin/settings/about', [App\Http\Controllers\Admin\SettingsController::class, 'updateAboutSettings'])
+            ->name('admin.settings.about.update');
         // Inventory Management Routes
         Route::get('/admin/inventory', [InventoryController::class, 'index'])->name('admin.inventory');
         Route::get('/admin/inventory/create', [InventoryController::class, 'create'])->name('admin.inventory.create');
@@ -167,7 +230,7 @@ Route::middleware(['auth', 'verified', PreventBackHistory::class])->group(functi
         Route::post('/admin/inventory/{id}/adjust', [InventoryController::class, 'adjustQuantity'])->name('admin.inventory.adjust');
         Route::post('/admin/inventory/order-critical', [InventoryController::class, 'orderCriticalItem'])->name('admin.inventory.order-critical');
         Route::put('/admin/inventory/categories/{category}', [InventoryController::class, 'updateCategory'])->name('admin.inventory.categories.update');
-        
+
         // Jez
         Route::post('/admin/inventory/record-usage', [InventoryController::class, 'recordUsage'])->name('admin.inventory.record-usage');
 
@@ -187,7 +250,8 @@ Route::middleware(['auth', 'verified', PreventBackHistory::class])->group(functi
         Route::get('/admin/graphs/users/pdf', [\App\Http\Controllers\Admin\GraphController::class, 'userGraphsPdf'])->name('admin.graphs.users.pdf');
 
         //Sentiment
-        Route::get('/admin/sentiment', [\App\Http\Controllers\SentimentController::class, 'index']) ->name('admin.sentiment');
+        Route::get('/admin/sentiment', [\App\Http\Controllers\SentimentController::class, 'index'])->name('admin.sentiment');
+        Route::put('/admin/sentiment/{id}/reanalyze', [\App\Http\Controllers\SentimentController::class, 'reanalyze'])->name('admin.sentiment.reanalyze');
 
         // Appointment Analytics
         Route::get('/admin/graphs/appointments', [\App\Http\Controllers\Admin\GraphController::class, 'appointmentGraphs'])->name('admin.graphs.appointments');
@@ -195,13 +259,14 @@ Route::middleware(['auth', 'verified', PreventBackHistory::class])->group(functi
 
         // Appointment Reports
         Route::prefix('admin/reports')->name('admin.reports.')->middleware(['auth'])->group(function () {
-        Route::get('/status-during-period', [App\Http\Controllers\Admin\AppointmentReportController::class, 'statusDuringPeriod'])->name('status_during_period');
-        Route::get('/status-during-period/pdf', [App\Http\Controllers\Admin\AppointmentReportController::class, 'exportPdf'])->name('status_during_period.pdf');});
+            Route::get('/status-during-period', [App\Http\Controllers\Admin\AppointmentReportController::class, 'statusDuringPeriod'])->name('status_during_period');
+            Route::get('/status-during-period/pdf', [App\Http\Controllers\Admin\AppointmentReportController::class, 'exportPdf'])->name('status_during_period.pdf');
+        });
 
         //FOR RESCHEDULING APPOINTMENTD
         Route::get('/admin/appointments/slots', [ManageAppointmentController::class, 'getAvailableSlots'])
-        ->name('admin.appointments.slots');
-                    
+            ->name('admin.appointments.slots');
+
         Route::get('/get-available-slots', [ManageAppointmentController::class, 'getAvailableSlots']);
 
         //PATIENT RECORDS
@@ -210,9 +275,6 @@ Route::middleware(['auth', 'verified', PreventBackHistory::class])->group(functi
     });
 });
 
-// FOR LOGIN
-Route::get('/login', [LoginController::class, 'create'])->name('login');
-Route::post('/login', [LoginController::class, 'store']);
 
 // FOR REGISTER
 Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
@@ -235,7 +297,7 @@ Route::get('/email/verify', function () {
 
 Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
     $request->fulfill();
-    
+
     switch ($request->user()->user_type) {
         case 'admin':
         case 'staff':

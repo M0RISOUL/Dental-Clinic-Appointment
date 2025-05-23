@@ -3,6 +3,8 @@
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\PatientMiddleware;
 use App\Http\Middleware\PreventUpdateOnSentMessages;
+use App\Http\Middleware\PreventBackHistory;
+use App\Http\Middleware\PreventLoggedInAccess;
 
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -18,7 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'patientMiddleware' => PatientMiddleware::class,
             'adminMiddleware' => AdminMiddleware::class,
-            'preventUpdateOnSent'=>PreventUpdateOnSentMessages::class
+            'preventUpdateOnSent' => PreventUpdateOnSentMessages::class,
+            'preventBackHistory' => PreventBackHistory::class,
+            'guest' => PreventLoggedInAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

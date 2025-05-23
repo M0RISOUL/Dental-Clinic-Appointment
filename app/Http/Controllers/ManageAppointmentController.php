@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use App\Mail\MessageNotification;
 use App\Models\Payment;
 use App\Models\Receipt;
+use App\Models\AuditTrail;
 use Illuminate\Support\Facades\Mail;
 use App\Models\AvailableAppointment;
 
@@ -60,45 +61,64 @@ class ManageAppointmentController extends Controller
         switch ($request->action) {
             case 'approve':
                 $appointment->update(['status' => 'Approved']);
+                break;
 
-                if ($action === 'approve') {
-                    DB::table('appointments')->where('id', $request->id)
-                        ->update(['status' => 'Approved', 'updated_at' => Carbon::now()]);
-                } elseif ($action === 'cancel') {
-                    DB::table('appointments')->where('id', $request->id)
-                        ->update(['status' => 'Unattended', 'updated_at' => Carbon::now()]);
-                } elseif ($action === 'attended') {
-                    DB::table('appointments')->where('id', $request->id)
-                        ->update(['status' => 'Attended', 'updated_at' => Carbon::now()]);
-                } elseif ($action === 'delete') {
-                    DB::table('appointments')->where('id', $request->id)->delete();
-                    return redirect()->route('appointments.index')->with('success', 'Appointment deleted.');
-                }
+            case 'reschedule':
+                $request->validate([
+                    'date' => 'required|date',
+                    'time' => 'required|string'
+                ]);
 
-                if ($request->filled('message')) {
-                    DB::table('messages')->insert([
-                        'appointment_id' => $request->id,
-                        'message' => $request->message,
-                        // 'created_at' => now(),
-                        // 'updated_at' => now(),
-                    ]);
-                
-                    if (!empty($appointment->email)) {
-                        $status = match ($request->action) {
-                            'approve' => 'Approved',
-                            'cancel' => 'Cancelled',
-                            'attended' => 'Attended',
-                            default => 'Unattended',
-                        };
+                $appointment->update([
+                    'date'   => $request->date,
+                    'time'   => $request->time,
+                    'status' => 'Pending',
+                ]);
+                break;
 
-                        $patientName = Appointment::where('id', $appointment->id)->value('patient_name');
-                
-                        Mail::to($appointment->email)->send(new MessageNotification($request->message, $status, $patientName));
-                    }
-                }
+            case 'cancel':
+                $appointment->update(['status' => 'Cancelled']);
+                break;
 
-            return redirect()->route('appointments.index')->with('success', 'Status updated and message sent.');
+            case 'attended':
+                $appointment->update(['status' => 'Attended']);
+                break;
+
+            case 'delete':
+                $appointment->delete();
+                return redirect()->route('appointments.index')->with('success', 'Appointment deleted.');
         }
+
+        // Save optional message if provided
+        if ($request->filled('message')) {
+            DB::table('messages')->updateOrInsert(
+                ['appointment_id' => $appointment->id], // Check condition
+                [
+                    'message' => $request->message,
+                    'updated_at' => now(),
+                    'created_at' => now(), // Note: only used if it's a new insert
+                ]
+            );
+        }
+
+        // Send email notification using MessageNotification
+        if (!empty($appointment->email)) {
+            $status = match ($request->action) {
+                'approve' => 'Approved',
+                'reschedule' => 'Pending',
+                'cancel' => 'Cancelled',
+                'attended' => 'Attended',
+                default => 'Unattended',
+            };
+
+            $patientName = $appointment->patient_name ?? 'Patient';
+
+            Mail::to($appointment->email)->send(
+                new MessageNotification($request->message, $status, $patientName)
+            );
+        }
+
+        return redirect()->route('appointments.index')->with('success', 'Appointment status updated and email sent.');
     }
 
     public function sendMessage(Request $request)
@@ -179,7 +199,7 @@ class ManageAppointmentController extends Controller
         // Validate the incoming request
         $request->validate([
             'date' => 'required|date',
-            'time'         => 'required|string',
+            'time' => 'required|string',
         ]);
 
         // Find the appointment to reschedule
@@ -218,10 +238,10 @@ class ManageAppointmentController extends Controller
 
         // Log the change in the audit trail
         AuditTrail::create([
-            'user_id'    => Auth::user()->id,
-            'action'     => 'Rescheduled Appointment',
-            'model'      => 'Appointment',
-            'changes'    => json_encode(['new_date' => $newDate, 'new_time' => $newTime]),
+            'user_id' => Auth::user()->id,
+            'action' => 'Rescheduled Appointment',
+            'model' => 'Appointment',
+            'changes' => json_encode(['new_date' => $newDate, 'new_time' => $newTime]),
             'ip_address' => $request->ip(),
             'user_agent' => $request->header('User-Agent'),
         ]);

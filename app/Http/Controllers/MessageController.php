@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\UserMessages;
 use App\Models\Reply;
+use App\Models\User;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,15 +13,19 @@ use Illuminate\Support\Carbon;
 class MessageController extends Controller
 {
 
-    public function postMessage(Request $request, $messageId)
+    public function postMessage(Request $request)
     {
 
         $request->validate([
             'message' => 'required|string|max:5000',
             'user_to' => 'required|email',
             'user_from' => 'required|email',
+            'subject' => 'required|string',
+
         ], [
             'message.required' => 'Message is required!',
+            'subject.required' => 'Subject is required!',
+
         ]);
 
         // Retrieve user IDs from emails
@@ -34,7 +39,6 @@ class MessageController extends Controller
 
         // Create a message
         UserMessages::create([
-            'message_id' => $messageId,
             'user_id' => Auth::user()->id,
             'message' => $usermessage,
             'subject' => $request->subject,
@@ -51,16 +55,17 @@ class MessageController extends Controller
     public function updateSeenStatus($id, Request $request)
     {
         $message = UserMessages::find($id);
-        if (!$message) {
-            return response()->json(['success' => false, 'message' => 'Message not found'], 404);
-        }
-        if ($request->query('status') === 'sent') {
-            return response()->json(['success' => false, 'message' => 'Cannot update message status on sent messages'], 403);
-        }
+        // if (!$message) {
+        //     return response()->json(['success' => false, 'message' => 'Message not found'], 404);
+        // }
 
-        if ($message->status === 'sent') {
-            return response()->json(['success' => false, 'message' => 'Unauthorized action'], 403);
-        }
+        // if ($request->query('status') !== 'received') {
+        //     return response()->json(['success' => false, 'message' => 'Cannot update sent messages'], 403);
+        // }
+
+        // if ($message->status === 'sent') {
+        //     return response()->json(['success' => false, 'message' => 'Unauthorized action'], 403);
+        // }
 
         $message->read_at = Carbon::now();
         $message->save();
@@ -68,25 +73,38 @@ class MessageController extends Controller
         return response()->json(['success' => true, 'message' => 'Message marked as seen']);
     }
 
+
     public function getMessages(Request $request)
     {
+
         $userId = Auth::id();
 
+        $allPatients = User::where('user_type', 'patient')
+            ->where('id', '!=', auth()->id())
+            ->get();
+
+        $allAdmins = User::whereIn('user_type', ['admin', 'staff'])
+            ->where('id', '!=', auth()->id())
+            ->get();
+
+
+        // Ensure recipients is an array of emails
+        $recipients = Auth::user()->user_type === 'patient'
+            ? $allAdmins->pluck('email')->toArray()
+            : $allPatients->pluck('email')->toArray();
         $status = $request->query('status', 'received');
 
         if ($status == 'sent') {
             $messages = UserMessages::where('sender_id', $userId)
-                ->where('status', 'sent')
                 ->orderBy('created_at', 'desc')
                 ->get();
         } else {
             $messages = UserMessages::where('receiver_id', $userId)
-                ->where('status', 'received')
                 ->orderBy('created_at', 'desc')
                 ->get();
         }
 
-        return view('patient.messages', compact('messages'));
+        return view('messages', compact('messages', 'allPatients', 'allAdmins', 'recipients'));
     }
 
 
@@ -116,8 +134,10 @@ class MessageController extends Controller
             'message' => 'required|string|max:5000',
             'user_to' => 'required|email',
             'user_from' => 'required|email',
+            'subject' => 'required|string',
         ], [
             'message.required' => 'Message is required!',
+            'subject.required' => 'Subject is required!',   
         ]);
 
         // Retrieve user IDs from emails

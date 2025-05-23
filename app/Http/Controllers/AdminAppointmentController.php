@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use GuzzleHttp\Client;
+
 
 class AdminAppointmentController extends Controller
 {
@@ -34,6 +36,7 @@ class AdminAppointmentController extends Controller
         $currentHour = (int)now()->format('H');
         $currentMinute = (int)now()->format('i');
         
+        // Loop through each available appointment to add extra properties.
         foreach ($availableAppointments as $appointment) {
             $isPastDate = $appointment->date < $currentDate;
             
@@ -43,7 +46,6 @@ class AdminAppointmentController extends Controller
                 if (count($timeSlotParts) == 2) {
                     $startTime = trim($timeSlotParts[0]);
                     $startHour = (int)explode(':', $startTime)[0];
-                    
                     $isPastTime = ($currentHour > $startHour) ||
                         ($currentHour == $startHour && $currentMinute >= 30);
                 }
@@ -59,16 +61,38 @@ class AdminAppointmentController extends Controller
                 ->whereIn('status', ['Approved', 'Attended'])
                 ->count();
                 
-            $appointment->available_slots = $appointment->max_slots - $takenSlots;
+            $appointment->available_slots = max(0, $appointment->max_slots - $takenSlots);
             $appointment->has_active_bookings = ($activeAppointments > 0);
             $appointment->is_past_date = $isPastDate;
             $appointment->is_past_time = $isPastTime;
             $appointment->is_completed = $isPastDate || $isPastTime;
         }
         
-        return view('admin.appointments.create', compact('availableAppointments'));
-    }
+        // --- Dynamic Holidays via API ---
+        $year = Carbon::now()->year;
+        $client = new Client();
+        $response = $client->request('GET', "https://date.nager.at/api/v3/PublicHolidays/{$year}/PH");
+        $holidaysData = json_decode($response->getBody(), true);
 
+        $holidays = [];
+        foreach ($holidaysData as $holiday) {
+            $dateParts = explode('-', $holiday['date']); // format: YYYY-MM-DD
+            $month = (int)$dateParts[1] - 1; // convert to 0-indexed month
+            $day = (int)$dateParts[2];
+            $holidays[] = [
+                'month' => $month,
+                'day'   => $day,
+                'name'  => $holiday['localName'] 
+            ];
+        }
+        $holidaysJson = json_encode($holidays);
+        // --- End Dynamic Holidays ---
+
+        return view('admin.appointments.create', compact('availableAppointments'))
+            ->with('holidays', $holidays)
+            ->with('holidaysJson', $holidaysJson);
+    }
+    
     // Store a new available appointment slot
     // public function store(Request $request)
     // {

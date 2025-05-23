@@ -19,8 +19,8 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->string('user_type', ['admin', 'patient']);
-            $table->string('gender', ['male', 'female', 'others']);
+            $table->enum('user_type', ['admin', 'patient']);
+            $table->enum('gender', ['male', 'female', 'others']);
             $table->string('image_path')->nullable();
             $table->rememberToken();
             $table->timestamps();

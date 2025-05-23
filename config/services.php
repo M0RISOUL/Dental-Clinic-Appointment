@@ -13,6 +13,10 @@ return [
     | a conventional file to locate the various service credentials.
     |
     */
+    
+    'huggingface' => [
+    'url' => env('HUGGINGFACE_API_URL'),
+    ],
 
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),

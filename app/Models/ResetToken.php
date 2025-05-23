@@ -12,7 +12,9 @@ class ResetToken extends Model
 
     protected $table = "password_reset_tokens";
 
-    protected $guarded = [];
+    protected $fillable = ['email', 'token', 'created_at'];
+
+    public $timestamps = false;
 
     public function user(): BelongsTo
     {

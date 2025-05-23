@@ -8,6 +8,8 @@ use App\Models\AvailableAppointment;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use App\Mail\AppointmentSuccess;
+use Illuminate\Support\Facades\Mail;
 
 class AppointmentController extends Controller
 {
@@ -113,6 +115,9 @@ class AppointmentController extends Controller
         } else {
             return back()->withErrors(['error' => 'Failed to create appointment.']);
         }
+        
+        // Send confirmation email
+        Mail::to($user->email)->send(new AppointmentSuccess($user, $appointment));
 
         AuditTrail::create([
             'user_id' => $request->user()->id,

@@ -339,12 +339,22 @@ class InventoryController extends Controller
     /* Record usage of an inventory item.*/
     public function recordUsage(Request $request)
     {
-        $request->validate([
-            'inventory_id' => 'required|exists:inventory,id',
-            'quantity' => 'required|integer|min:1',
-            'appointment_id' => 'nullable',
-            'notes' => 'nullable|string',
-        ]);
+$request->validate([
+    'inventory_id' => 'required|exists:inventory,id',
+    'quantity' => 'required|integer|min:1',
+    'appointment_id' => 'nullable',
+    'notes' => [
+        function ($attribute, $value, $fail) use ($request) {
+            if (empty($request->appointment_id) || $request->appointment_id === 'no_appointment') {
+                if (empty($value)) {
+                    $fail('The reason for usage is required when no specific appointment is selected.');
+                }
+            }
+        },
+        'string',
+        'nullable',
+    ],
+]);
 
         // Get the existing item
         $item = DB::table('inventory')->where('id', $request->inventory_id)->first();
@@ -418,18 +428,23 @@ class InventoryController extends Controller
                 'updated_at' => now()
             ]);
             
-            // Log the activity
-            $description = '<span class="font-medium text-blue-600">' . e(Auth::user()->name) . '</span> used ' .
-                          '<span class="font-medium">' . e($request->quantity) . ' ' . e($item->unit) . ' of ' . e($item->item_name) . '</span>';
-            
-            if ($appointmentId) {
-                $appointment = DB::table('appointments')->where('id', $appointmentId)->first();
-                if ($appointment) {
-                    $description .= ' for <span class="text-gray-600">appointment with ' . e($appointment->patient_name) . '</span>';
-                }
-            }
-            
-            Activity::log('use', $description, Auth::id(), $request->inventory_id);
+// Log the activity
+$description = '<span class="font-medium text-blue-600">' . e(Auth::user()->name) . '</span> used ' .
+               '<span class="font-medium">' . e($request->quantity) . ' ' . e($item->unit) . ' of ' . e($item->item_name) . '</span>';
+
+if ($appointmentId) {
+    $appointment = DB::table('appointments')->where('id', $appointmentId)->first();
+    if ($appointment) {
+        $description .= ' for <span class="text-gray-600">appointment with ' . e($appointment->patient_name) . '</span>';
+    }
+}
+
+// Add the reason for usage if provided
+if (!empty($request->notes)) {
+    $description .= '. <span class="text-gray-600">Reason: ' . e($request->notes) . '</span>';
+}
+
+Activity::log('use', $description, Auth::id(), $request->inventory_id);
 
             DB::commit();
             return redirect()->route('admin.inventory')
